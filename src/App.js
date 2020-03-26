@@ -1,24 +1,175 @@
-import React from 'react';
+import React, { useState } from 'react';
 import logo from './logo.svg';
 import './App.css';
+import * as firebase from "firebase/app";
+import "firebase/auth";
+import firebaseConfig from './firebase-config';
+
+firebase.initializeApp(firebaseConfig)
 
 function App() {
+  const [user , setUser] = useState({
+    isSignedIn: false,
+    name:'',
+    email:'',
+    photo:'',
+  })
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+  const handleSignIn = () =>{
+    firebase.auth().signInWithPopup(provider)
+    .then(res =>{
+      const {displayName, email, photoUrl} = res.user;
+      const signedInUser ={
+        isSignedIn: true,
+        name: displayName,
+        email: email,
+        photo: photoUrl,
+      }
+      setUser(signedInUser);
+         console.log(displayName, email, photoUrl);
+    })
+    .catch(err=>{
+      console.log(err);
+      console.log(err.message);
+    })
+  }
+
+  const handleSignOut =() => {
+    firebase.auth().signOut()
+    .then(res =>{
+      const singedOutUser = {
+        isSignedIn: false,
+        name : '',
+        email:'',
+        photo:'',
+        password:'',
+        error:'',
+        isvalid:false,
+        existingUser:false
+      }
+      setUser(singedOutUser);
+      console.log(res);
+    
+    })
+    .catch(err =>{
+      
+    })
+  }
+
+  const is_valid_email = email =>  /(.+)@(.+){2,}\.(.+){2,}/.test(email);
+  const hasNumber = input => /\d/.test(input);
+   
+  const switchFrom = e =>{
+    const createUser = {...user};
+    createUser.existingUser = e.target.checked;
+    setUser(createUser);
+  }
+
+   const handleChange = e => {
+     const newUserInfo ={
+       ...user
+     };
+
+     // Perform validation
+     let isvalid = true;
+     if(e.target.name === 'email'){
+      isvalid = is_valid_email(e.target.value);
+     }
+     if(e.target.name === 'password'){
+       isvalid =e.target.value.length > 8 && hasNumber(e.target.value);
+     }
+
+
+     newUserInfo[e.target.name]= e.target.value;
+     newUserInfo.isvalid = isvalid;
+     setUser(newUserInfo);
+   }
+
+   const createAccount = (event) => {
+     if(user.isvalid){
+     firebase.auth().createUserWithEmailAndPassword(user.email, user.password)
+     .then(res =>{
+      console.log(res);
+      const createUser = {...user};
+      createUser.isSignedIn = true;
+      createUser.error = '';
+      setUser(createUser);
+     })
+     .catch(err => {
+       console.log(err.message);
+       const createUser = {...user};
+      createUser.isSignedIn = false;
+      createUser.error = err.message;
+      setUser(createUser);
+     })
+     }
+    event.preventDefault();
+     event.target.reset();
+   }
+
+   const signInUser = event =>{
+    if(user.isvalid){
+      firebase.auth().signInWithEmailAndPassword(user.email, user.password)
+      .then(res =>{
+       console.log(res);
+       const createUser = {...user};
+       createUser.isSignedIn = true;
+       createUser.error = '';
+       setUser(createUser);
+      })
+      .catch(err => {
+        console.log(err.message);
+        const createUser = {...user};
+       createUser.isSignedIn = false;
+       createUser.error = err.message;
+       setUser(createUser);
+      })
+      }
+     event.preventDefault();
+     event.target.reset();
+   }
+
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      {
+        user.isSignedIn ?  <button onClick={handleSignOut}>Sign out</button> : 
+        <button onClick={handleSignIn}>Sign in</button>
+      }
+      {
+        user.isSignedIn && <div>
+           <p>Welcome, {user.name}</p>
+           <p>Your email : {user.email}</p>
+           <img src={user.photo} alt=""></img>
+        </div>
+      }
+      <h1>Our own Authentication</h1>
+     <label htmlFor="switchForm">Returning user</label>
+     <input type="checkbox" name="switchForm" onChange={switchFrom} id="switchForm"/>
+      <form style={{display:user.existingUser ? 'block' : 'none'}} onSubmit ={signInUser}>
+      <input type="text" onBlur={handleChange} name="email" placeholder="Your email" required/>
+      <br/>
+      <input type="password" onBlur={handleChange} name="password" placeholder="Your password" required/>
+      <br/>
+      <input type="submit" value="SignIn"/>
+      </form>
+
+
+
+      <form style={{display:user.existingUser ? 'none' : 'block'}} onSubmit ={createAccount}>
+      <input type="text" onBlur={handleChange} name="name" placeholder="Your Name" required/>
+      <br/>
+      <input type="text" onBlur={handleChange} name="email" placeholder="Your email" required/>
+      <br/>
+      <input type="password" onBlur={handleChange} name="password" placeholder="Your password" required/>
+      <br/>
+      <input type="submit" value="Create Account"/>
+      </form>
+      {
+        user.error && <p style={{color:'red'}}>{user.error}</p>
+      }
+      
     </div>
   );
 }
